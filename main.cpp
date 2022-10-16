@@ -12,7 +12,7 @@
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// FITNESS FOR A PARTICULAR PURPOSE AND NON INFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -28,7 +28,6 @@
 #include <iostream>
 #include <numeric>
 #include <span>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -165,7 +164,7 @@ int main(int argc, char *argv[]) {
     opts.n = branches.size();
 
   std::partial_sort(
-      branches.begin(), branches.begin() + size_t(opts.n), branches.end(),
+      branches.begin(), branches.begin() + opts.n, branches.end(),
       [](auto &a, auto &b) { return a.commit_time > b.commit_time; });
 
   auto recent = std::span(branches.begin(), opts.n);
@@ -183,7 +182,7 @@ int main(int argc, char *argv[]) {
 
     // clang-format off
     std::cout << (git_branch_is_head(e.ref) ? "* " : "  ")
-              << std::left << std::setw(max_branch_size) << e.name << "  "
+              << std::left << std::setw(int(max_branch_size)) << e.name << "  "
               << std::right << format_duration(duration) << "  "
               << std::left << git_commit_summary(e.commit) << "\n";
     // clang-format on
