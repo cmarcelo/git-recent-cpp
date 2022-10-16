@@ -1,4 +1,3 @@
-
 {
   description = "Show recent used git branches";
 
@@ -13,13 +12,8 @@
         version = "1";
         src = ./.;
 
-        # Meson is no longer able to pick up Boost automatically.
-        # https://github.com/NixOS/nixpkgs/issues/86131
-        BOOST_INCLUDEDIR = "${pkgs.lib.getDev pkgs.boost}/include";
-        BOOST_LIBRARYDIR = "${pkgs.lib.getLib pkgs.boost}/lib";
-
         buildInputs = [
-          pkgs.meson
+          pkgs.cmake
           pkgs.ninja
           pkgs.libgit2
           pkgs.pkg-config
