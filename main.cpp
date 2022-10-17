@@ -151,8 +151,8 @@ int run(options opts) {
   if (opts.n == 0 || opts.n > branches.size())
     opts.n = branches.size();
 
-  std::partial_sort(
-      branches.begin(), branches.begin() + opts.n, branches.end(),
+  std::ranges::partial_sort(
+      branches, branches.begin() + opts.n,
       [](auto &a, auto &b) { return a.commit_time > b.commit_time; });
 
   auto recent = std::span(branches.begin(), opts.n);
