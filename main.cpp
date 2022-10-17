@@ -146,13 +146,22 @@ collect_branches(git_repository *repo, git_branch_t branch_type) {
   return {branches, {}};
 }
 
+// TODO: Is there a better way to do this?
+template <typename T>
+std::unique_ptr<T, void (*)(T *)> make_unique_with_deleter(auto *t, auto *d) {
+  return std::unique_ptr<T, void (*)(T *)>(t, d);
+}
+
 std::optional<error> run(options opts) {
-  git_repository *repo = nullptr;
-  if (int err = git_repository_open_ext(&repo, ".", 0, nullptr); err)
+  git_repository *repo_ = nullptr;
+  if (int err = git_repository_open_ext(&repo_, ".", 0, nullptr); err)
     return make_git_error();
 
-  auto [branches, err] = collect_branches(repo, opts.remote ? GIT_BRANCH_REMOTE
-                                                            : GIT_BRANCH_LOCAL);
+  auto repo =
+      make_unique_with_deleter<git_repository>(repo_, git_repository_free);
+
+  auto [branches, err] = collect_branches(
+      repo.get(), opts.remote ? GIT_BRANCH_REMOTE : GIT_BRANCH_LOCAL);
   if (err)
     return err;
 
@@ -188,8 +197,6 @@ std::optional<error> run(options opts) {
     git_commit_free(e.commit);
     git_reference_free(e.ref);
   }
-
-  git_repository_free(repo);
 
   return {};
 }
