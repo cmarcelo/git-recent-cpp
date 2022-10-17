@@ -105,20 +105,13 @@ options parse_options(int argc, char *argv[]) {
   };
 }
 
-void exit_with_git_error(int err) {
-  const git_error *e = git_error_last();
-  std::cerr << "error: " << e->message << " (" << err << "/" << e->klass
-            << ")\n";
-  exit(1);
-}
-
 std::vector<entry> collect_branches(git_repository *repo,
                                     git_branch_t branch_type) {
   std::vector<entry> branches;
 
   git_branch_iterator *branch_it = nullptr;
   if (int err = git_branch_iterator_new(&branch_it, repo, branch_type); err)
-    exit_with_git_error(err);
+    throw err;
 
   while (true) {
     git_reference *ref = nullptr;
@@ -126,12 +119,12 @@ std::vector<entry> collect_branches(git_repository *repo,
     if (int err = git_branch_next(&ref, &type, branch_it); err) {
       if (err == GIT_ITEROVER)
         break;
-      exit_with_git_error(err);
+      throw err;
     }
 
     git_object *obj = nullptr;
     if (int err = git_reference_peel(&obj, ref, GIT_OBJECT_COMMIT); err)
-      exit_with_git_error(err);
+      throw err;
 
     branches.emplace_back(ref, reinterpret_cast<git_commit *>(obj));
   }
@@ -141,24 +134,19 @@ std::vector<entry> collect_branches(git_repository *repo,
   return branches;
 }
 
-} // namespace
-
-int main(int argc, char *argv[]) {
-  auto opts = parse_options(argc, argv);
-
-  git_libgit2_init();
-
+int run(options opts) {
   git_repository *repo = nullptr;
-  if (int err = git_repository_open_ext(&repo, ".", 0, nullptr); err) {
-    if (err == GIT_ENOTFOUND) {
-      std::cerr << "error: git repository not found\n";
-      exit(1);
-    }
-    exit_with_git_error(err);
-  }
+  if (int err = git_repository_open_ext(&repo, ".", 0, nullptr); err)
+    return err;
 
-  auto branches = collect_branches(repo, opts.remote ? GIT_BRANCH_REMOTE
-                                                     : GIT_BRANCH_LOCAL);
+  // TODO: Use the boost equivalent of std::expected here.
+  std::vector<entry> branches;
+  try {
+    branches = collect_branches(repo, opts.remote ? GIT_BRANCH_REMOTE
+                                                            : GIT_BRANCH_LOCAL);
+  } catch (int err) {
+    return err;
+  }
 
   if (opts.n == 0 || opts.n > branches.size())
     opts.n = branches.size();
@@ -194,7 +182,34 @@ int main(int argc, char *argv[]) {
   }
 
   git_repository_free(repo);
-  git_libgit2_shutdown();
 
+  return 0;
+}
+
+} // namespace
+
+int main(int argc, char *argv[]) {
+  auto opts = parse_options(argc, argv);
+
+  git_libgit2_init();
+
+  if (int err = run(opts); err) {
+    switch (err) {
+    case GIT_ENOTFOUND: {
+      std::cerr << "error: git repository not found\n";
+      break;
+    }
+
+    default: {
+      const git_error *e = git_error_last();
+      std::cerr << "error: " << e->message << " (" << err << "/" << e->klass
+                << ")\n";
+      break;
+    }
+    }
+    return EXIT_FAILURE;
+  }
+
+  git_libgit2_shutdown();
   return 0;
 }
