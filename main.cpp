@@ -7,8 +7,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <boost/outcome.hpp>
 #include <boost/program_options.hpp>
 #include <git2.h>
 
@@ -50,6 +51,17 @@ struct entry {
   const char *name;
   std::chrono::system_clock::time_point commit_time;
 };
+
+struct error {
+  std::string msg;
+};
+
+error make_git_error() {
+  if (const git_error *ge = git_error_last(); ge)
+    return {ge->message};
+  else
+    return {"error"};
+}
 
 std::string format_duration(std::chrono::system_clock::duration duration) {
   namespace c = std::chrono;
@@ -105,13 +117,13 @@ options parse_options(int argc, char *argv[]) {
   };
 }
 
-std::vector<entry> collect_branches(git_repository *repo,
-                                    git_branch_t branch_type) {
+std::tuple<std::vector<entry>, std::optional<error>>
+collect_branches(git_repository *repo, git_branch_t branch_type) {
   std::vector<entry> branches;
 
   git_branch_iterator *branch_it = nullptr;
   if (int err = git_branch_iterator_new(&branch_it, repo, branch_type); err)
-    throw err;
+    return {branches, make_git_error()};
 
   while (true) {
     git_reference *ref = nullptr;
@@ -119,34 +131,30 @@ std::vector<entry> collect_branches(git_repository *repo,
     if (int err = git_branch_next(&ref, &type, branch_it); err) {
       if (err == GIT_ITEROVER)
         break;
-      throw err;
+      return {branches, make_git_error()};
     }
 
     git_object *obj = nullptr;
     if (int err = git_reference_peel(&obj, ref, GIT_OBJECT_COMMIT); err)
-      throw err;
+      return {branches, make_git_error()};
 
     branches.emplace_back(ref, reinterpret_cast<git_commit *>(obj));
   }
 
   git_branch_iterator_free(branch_it);
 
-  return branches;
+  return {branches, {}};
 }
 
-int run(options opts) {
+std::optional<error> run(options opts) {
   git_repository *repo = nullptr;
   if (int err = git_repository_open_ext(&repo, ".", 0, nullptr); err)
-    return err;
+    return make_git_error();
 
-  // TODO: Use the boost equivalent of std::expected here.
-  std::vector<entry> branches;
-  try {
-    branches = collect_branches(repo, opts.remote ? GIT_BRANCH_REMOTE
+  auto [branches, err] = collect_branches(repo, opts.remote ? GIT_BRANCH_REMOTE
                                                             : GIT_BRANCH_LOCAL);
-  } catch (int err) {
+  if (err)
     return err;
-  }
 
   if (opts.n == 0 || opts.n > branches.size())
     opts.n = branches.size();
@@ -183,7 +191,7 @@ int run(options opts) {
 
   git_repository_free(repo);
 
-  return 0;
+  return {};
 }
 
 } // namespace
@@ -193,20 +201,8 @@ int main(int argc, char *argv[]) {
 
   git_libgit2_init();
 
-  if (int err = run(opts); err) {
-    switch (err) {
-    case GIT_ENOTFOUND: {
-      std::cerr << "error: git repository not found\n";
-      break;
-    }
-
-    default: {
-      const git_error *e = git_error_last();
-      std::cerr << "error: " << e->message << " (" << err << "/" << e->klass
-                << ")\n";
-      break;
-    }
-    }
+  if (auto err = run(opts); err) {
+    std::cerr << "error: " << err->msg << "\n";
     return EXIT_FAILURE;
   }
 
