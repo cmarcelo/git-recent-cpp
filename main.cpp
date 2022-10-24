@@ -26,6 +26,7 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
