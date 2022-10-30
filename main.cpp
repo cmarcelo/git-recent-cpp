@@ -23,8 +23,6 @@
 #include <git2.h>
 
 #include <chrono>
-#include <cstring>
-#include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -41,8 +39,8 @@ struct entry {
   entry(git_reference *ref, git_commit *commit)
       : ref(ref), commit(commit), name(nullptr) {
     git_branch_name(&name, ref);
-    commit_time = std::chrono::system_clock::from_time_t(time_t{0}) +
-                  std::chrono::seconds(git_commit_time(commit));
+    commit_time = std::chrono::system_clock::time_point{
+        std::chrono::seconds(git_commit_time(commit))};
   }
 
   git_reference *ref;
