@@ -18,10 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <boost/outcome.hpp>
-#include <boost/program_options.hpp>
-#include <git2.h>
-
 #include <chrono>
 #include <iomanip>
 #include <iostream>
@@ -29,6 +25,15 @@
 #include <span>
 #include <string>
 #include <vector>
+
+#include <git2.h>
+
+#include "absl/cleanup/cleanup.h"
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
+#include "absl/flags/usage.h"
+#include "absl/flags/usage_config.h"
+#include "absl/strings/str_format.h"
 
 // TODO: Should (also) look at "ref" file date?
 // TODO: Colored output?
@@ -86,35 +91,6 @@ struct options {
   bool remote;
 };
 
-options parse_options(int argc, char *argv[]) {
-  namespace po = boost::program_options;
-
-  po::options_description desc("Allowed options");
-
-  // clang-format off
-  desc.add_options()
-    ("help,h", "produce help message")
-    ("count,n", po::value<unsigned>()->default_value(7u),
-     "show at most N branches, zero means all branches")
-    ("remote",
-     "show remote branches instead of local branches");
-  // clang-format on
-
-  po::variables_map vm;
-  po::store(po::parse_command_line(argc, argv, desc), vm);
-  po::notify(vm);
-
-  if (vm.count("help")) {
-    std::cout << desc << "\n";
-    exit(0);
-  }
-
-  return {
-      .n = vm["count"].as<unsigned>(),
-      .remote = vm.count("remote") > 0,
-  };
-}
-
 std::tuple<std::vector<entry>, std::optional<error>>
 collect_branches(git_repository *repo, git_branch_t branch_type) {
   std::vector<entry> branches;
@@ -144,22 +120,15 @@ collect_branches(git_repository *repo, git_branch_t branch_type) {
   return {branches, {}};
 }
 
-// TODO: Is there a better way to do this?
-template <typename T>
-std::unique_ptr<T, void (*)(T *)> make_unique_with_deleter(auto *t, auto *d) {
-  return std::unique_ptr<T, void (*)(T *)>(t, d);
-}
-
 std::optional<error> run(options opts) {
-  git_repository *repo_ = nullptr;
-  if (int err = git_repository_open_ext(&repo_, ".", 0, nullptr); err)
+  git_repository *repo = nullptr;
+  if (int err = git_repository_open_ext(&repo, ".", 0, nullptr); err)
     return make_git_error();
 
-  auto repo =
-      make_unique_with_deleter<git_repository>(repo_, git_repository_free);
+  absl::Cleanup repo_deleter = [repo] { git_repository_free(repo); };
 
-  auto [branches, err] = collect_branches(
-      repo.get(), opts.remote ? GIT_BRANCH_REMOTE : GIT_BRANCH_LOCAL);
+  auto [branches, err] = collect_branches(repo, opts.remote ? GIT_BRANCH_REMOTE
+                                                            : GIT_BRANCH_LOCAL);
   if (err)
     return err;
 
@@ -183,12 +152,9 @@ std::optional<error> run(options opts) {
   for (const auto &e : recent) {
     const auto duration = now - e.commit_time;
 
-    // clang-format off
-    std::cout << (git_branch_is_head(e.ref) ? "* " : "  ")
-              << std::left << std::setw(int(max_branch_size)) << e.name << "  "
-              << std::right << format_duration(duration) << "  "
-              << std::left << git_commit_summary(e.commit) << "\n";
-    // clang-format on
+    absl::PrintF("%c %-*s  %s  %s\n", (git_branch_is_head(e.ref) ? '*' : ' '),
+                 int(max_branch_size), e.name, format_duration(duration),
+                 git_commit_summary(e.commit));
   }
 
   for (auto &e : branches) {
@@ -201,8 +167,20 @@ std::optional<error> run(options opts) {
 
 } // namespace
 
+ABSL_FLAG(bool, remote, false,
+          "show remote branches instead of local branches");
+ABSL_FLAG(uint32_t, n, 7u, "show at most N branches, zero means all branches");
+
 int main(int argc, char *argv[]) {
-  auto opts = parse_options(argc, argv);
+  absl::SetProgramUsageMessage("Show recent used git branches");
+  absl::SetFlagsUsageConfig(
+      {.contains_help_flags = [](auto s) { return s.ends_with("main.cpp"); }});
+  absl::ParseCommandLine(argc, argv);
+
+  options opts{
+      .n = absl::GetFlag(FLAGS_n),
+      .remote = absl::GetFlag(FLAGS_remote),
+  };
 
   git_libgit2_init();
 

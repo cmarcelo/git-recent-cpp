@@ -17,7 +17,6 @@
           pkgs.ninja
           pkgs.libgit2
           pkgs.pkg-config
-          pkgs.boost
         ];
       };
     in

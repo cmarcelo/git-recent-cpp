@@ -4,14 +4,19 @@ project(git-recent)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 20)
 
+set(ABSL_BUILD_TESTING OFF)
+set(ABSL_PROPAGATE_CXX_STD ON)
+add_subdirectory(thirdparty/abseil-cpp)
+
 find_package(PkgConfig)
 pkg_check_modules(libgit2 REQUIRED libgit2)
-find_package(Boost 1.74 REQUIRED COMPONENTS program_options)
 
 add_executable(git-recent
         main.cpp)
 target_link_libraries(git-recent
         ${libgit2_LIBRARIES}
-        Boost::program_options)
+        absl::flags_parse
+        absl::strings
+        absl::cleanup)
 
 install(TARGETS git-recent)
