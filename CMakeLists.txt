@@ -1,22 +1,17 @@
 cmake_minimum_required(VERSION 3.22)
 project(git-recent)
 
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 20)
-
-set(ABSL_BUILD_TESTING OFF)
-set(ABSL_PROPAGATE_CXX_STD ON)
-add_subdirectory(thirdparty/abseil-cpp)
-
-find_package(PkgConfig)
-pkg_check_modules(libgit2 REQUIRED libgit2)
+include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+find_package(absl REQUIRED)
+find_package(libgit2 REQUIRED)
 
 add_executable(git-recent
         main.cpp)
 target_link_libraries(git-recent
-        ${libgit2_LIBRARIES}
+        libgit2::libgit2
         absl::flags_parse
         absl::strings
         absl::cleanup)
+set_property(TARGET git-recent PROPERTY CXX_STANDARD 20)
 
 install(TARGETS git-recent)

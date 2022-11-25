@@ -1,0 +1,7 @@
+[requires]
+abseil/20220623.0
+libgit2/1.5.0
+
+[generators]
+cmake_find_package
+cmake_paths
