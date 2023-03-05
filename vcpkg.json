@@ -1,0 +1,12 @@
+{
+  "name" : "git-recent",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "a325228200d7f229f3337e612e0077f2a5307090",
+  "dependencies" : [ {
+    "name" : "libgit2",
+    "version>=" : "1.4.2"
+  }, {
+    "name" : "abseil",
+    "version>=" : "20220623.1"
+  } ]
+}

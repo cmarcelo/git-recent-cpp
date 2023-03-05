@@ -33,6 +33,7 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "absl/flags/usage_config.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
 
 // TODO: Should (also) look at "ref" file date?
@@ -173,8 +174,9 @@ ABSL_FLAG(uint32_t, n, 7u, "show at most N branches, zero means all branches");
 
 int main(int argc, char *argv[]) {
   absl::SetProgramUsageMessage("Show recent used git branches");
-  absl::SetFlagsUsageConfig(
-      {.contains_help_flags = [](auto s) { return s.ends_with("main.cpp"); }});
+  absl::SetFlagsUsageConfig({.contains_help_flags = [](auto s) {
+    return absl::EndsWith(s, "main.cpp");
+  }});
   absl::ParseCommandLine(argc, argv);
 
   options opts{
